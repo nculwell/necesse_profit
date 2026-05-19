@@ -235,6 +235,8 @@ def analyze_profitability(items, broker, generic_groups):
         return f"  {label:<26}  {count_s:>5}  {per_s:>9}  {total_s:>8}"
 
     summary = []  # (name, category, cost, result_value, profit, pct) -- None cost/profit if incomplete
+    # ingredient -> (recipe_name, profit_pct, profit_per_unit) for the best profitable recipe
+    ing_best = {}
 
     for item in recipes:
         out.append(f"\n{'-' * 60}")
@@ -244,6 +246,7 @@ def analyze_profitability(items, broker, generic_groups):
 
         total_cost = 0
         complete = True
+        resolved_ings = []
         for ing in expand_ingredients(item.ingredients, items_by_name):
             name, count = ing["name"], ing["count"]
             name, per_unit = resolve_ingredient(name, broker, generic_groups)
@@ -253,6 +256,7 @@ def analyze_profitability(items, broker, generic_groups):
             else:
                 total = per_unit * count
                 total_cost += total
+            resolved_ings.append((name, count))
             out.append(row(name, count, per_unit, total))
 
         out.append("  " + "-" * 56)
@@ -263,6 +267,11 @@ def analyze_profitability(items, broker, generic_groups):
             out.append(row("Result value", "", "", item.broker_value))
             out.append(row(f"Profit  ({pct:+.0f}%)", "", "", f"{profit:+d}"))
             summary.append((item.name, item.category, total_cost, item.broker_value, profit, pct))
+            if profit > 0:
+                for ing_name, ing_count in resolved_ings:
+                    profit_per_unit = profit / ing_count
+                    if ing_name not in ing_best or profit_per_unit > ing_best[ing_name][2]:
+                        ing_best[ing_name] = (item.name, pct, profit_per_unit)
         else:
             out.append(row("Ingredients cost", "", "", "? (incomplete)"))
             summary.append((item.name, item.category, None, item.broker_value, None, None))
@@ -280,6 +289,15 @@ def analyze_profitability(items, broker, generic_groups):
         out.append(f"  {name:<26}  {cat:<15}  {cost:>6}  {value:>6}  {profit:>+7}  {pct:>+6.0f}%")
     for name, cat, cost, value, profit, pct in incomplete_rows:
         out.append(f"  {name:<26}  {cat:<15}  {'?':>6}  {value:>6}  {'?':>7}  {'?':>7}")
+
+    out.append(f"\n{'=' * 60}")
+    out.append("INGREDIENTS IN PROFITABLE RECIPES  (sorted by profit/unit)")
+    out.append(f"{'=' * 60}")
+    out.append(f"  {'Ingredient':<24}  {'Best Recipe':<26}  {'Margin':>7}  {'Profit/unit':>11}")
+    out.append("  " + "-" * 74)
+    ranked = sorted(ing_best.items(), key=lambda x: x[1][2], reverse=True)
+    for ing_name, (recipe_name, pct, profit_per_unit) in ranked:
+        out.append(f"  {ing_name:<24}  {recipe_name:<26}  {pct:>+6.0f}%  {profit_per_unit:>11.2f}")
 
     return "\n".join(out)
 
