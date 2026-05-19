@@ -116,18 +116,40 @@ KNOWN_BROKER_VALUES = {
     "Any Common Fish": 12,  # all 7 common fish share this value
 }
 
-GENERIC_INGREDIENTS = {
-    "Any Fruit":    ["Apple", "Banana", "Blackberry", "Blueberry", "Coconut",
-                     "Lemon", "Raspberry", "Strawberry"],
-    "Any Raw Meat": ["Beef", "Duck Breast", "Frog Leg", "Rabbit Leg",
-                     "Raw Chicken Leg", "Raw Mutton", "Raw Pork", "Shark Meat"],
-}
+def parse_group_members(html):
+    """Extract item names from a group/category page (itemplate spans in main content)."""
+    soup = BeautifulSoup(html, "html.parser")
+    content = soup.find(id="mw-content-text")
+    if not content:
+        return []
+    return [
+        a.get_text(strip=True)
+        for span in content.find_all("span", class_="itemplate")
+        for a in [span.find("a")]
+        if a
+    ]
 
-def resolve_ingredient(name, broker):
+def build_generic_groups(missing_names):
+    """For 'Any X' ingredients in missing_names, fetch their pages and parse members."""
+    groups = {}
+    for name in missing_names:
+        if not name.startswith("Any "):
+            continue
+        url = NECESSE_BASE_URL + "/" + name.replace(" ", "_")
+        try:
+            html = get(url)
+            members = parse_group_members(html)
+            if members:
+                groups[name] = members
+        except NotFoundError:
+            pass
+    return groups
+
+def resolve_ingredient(name, broker, generic_groups):
     """Return (display_label, broker_value). For generics, picks cheapest candidate and formats
     the label as e.g. 'Any Raw Meat (Raw Mutton)'."""
-    if name in GENERIC_INGREDIENTS:
-        candidates = [(n, broker[n]) for n in GENERIC_INGREDIENTS[name] if n in broker]
+    if name in generic_groups:
+        candidates = [(n, broker[n]) for n in generic_groups[name] if n in broker]
         if candidates:
             best_name, best_value = min(candidates, key=lambda x: x[1])
             return f"{name} ({best_name})", best_value
@@ -160,13 +182,13 @@ def fetch_missing_ingredients(items, broker):
             still_missing.append(name)
     return extra, still_missing
 
-def analyze_profitability(items, broker):
+def analyze_profitability(items, broker, generic_groups):
 
     recipes = [item for item in items if item.ingredients]
 
     out = []
 
-    for generic_name, candidates in GENERIC_INGREDIENTS.items():
+    for generic_name, candidates in generic_groups.items():
         out.append(f"{'─' * 40}")
         out.append(f"{generic_name}  (broker values, cheapest first)")
         out.append(f"  {'Item':<24}  {'Broker value':>12}")
@@ -194,7 +216,7 @@ def analyze_profitability(items, broker):
         complete = True
         for ing in item.ingredients:
             name, count = ing["name"], ing["count"]
-            name, per_unit = resolve_ingredient(name, broker)
+            name, per_unit = resolve_ingredient(name, broker, generic_groups)
             if per_unit is None:
                 complete = False
                 total = None
@@ -254,12 +276,17 @@ def main():
     broker = build_broker_lookup(items)
     extra, still_missing = fetch_missing_ingredients(items, broker)
     broker.update(extra)
+    generic_groups = build_generic_groups(still_missing)
+    unresolved = [n for n in still_missing if n not in generic_groups]
+
     if extra:
         print(f"Resolved {len(extra)} additional ingredient(s): {', '.join(sorted(extra))}")
-    if still_missing:
-        print(f"Could not resolve {len(still_missing)} ingredient(s): {', '.join(still_missing)}")
+    if generic_groups:
+        print(f"Built generic groups for: {', '.join(sorted(generic_groups))}")
+    if unresolved:
+        print(f"Could not resolve {len(unresolved)} ingredient(s): {', '.join(unresolved)}")
 
-    report = analyze_profitability(items, broker)
+    report = analyze_profitability(items, broker, generic_groups)
     with open("output/profitability.txt", "w", encoding="utf8") as f:
         f.write(report + "\n")
     print("Wrote output/profitability.txt")
