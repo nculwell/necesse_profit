@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # vim: et ts=8 sts=4 sw=4
 
+import re
+import json
 import sys, os, itertools
 import requests
 from bs4 import BeautifulSoup
+from dataclasses import dataclass, field, asdict
+from typing import Optional
 
 NECESSE_BASE_URL = "https://necessewiki.com"
 NECESSE_CONSUMABLES_PAGE = NECESSE_BASE_URL + "/Consumables"
@@ -32,6 +36,57 @@ def get(url):
         f.write(response.text)
     return response.text
 
+@dataclass
+class FoodItem:
+    name: str
+    category: str
+    broker_value: Optional[int]
+    result_count: Optional[int]
+    ingredients: list  # [(ingredient_name, count), ...]
+
+def parse_itemplate(span):
+    a = span.find('a')
+    if not a:
+        return None, None
+    name = a.get_text(strip=True)
+    m = re.search(r'\((\d+)\)', span.get_text())
+    count = int(m.group(1)) if m else 1
+    return name, count
+
+def parse_food_page(html):
+    soup = BeautifulSoup(html, "html.parser")
+
+    broker_value = None
+    for td in soup.find_all('td', class_='infobox-section'):
+        if 'Broker value' in td.get_text():
+            detail = td.find_next_sibling('td', class_='infobox-detail')
+            if detail:
+                m = re.match(r'(\d+)', detail.get_text(strip=True))
+                if m:
+                    broker_value = int(m.group(1))
+            break
+
+    result_count = None
+    ingredients = []
+    for table in soup.find_all('table', class_='wikitable'):
+        for row in table.find_all('tr')[1:]:
+            cells = row.find_all('td')
+            if len(cells) < 2:
+                continue
+            # mw-selflink in the Result cell means this item is what's being crafted
+            if not cells[0].find(class_='mw-selflink'):
+                continue
+            result_span = cells[0].find('span', class_='itemplate')
+            if result_span:
+                _, result_count = parse_itemplate(result_span)
+            for ing_span in cells[1].find_all('span', class_='itemplate'):
+                name, count = parse_itemplate(ing_span)
+                if name:
+                    ingredients.append({"name": name, "count": count})
+            break
+
+    return broker_value, result_count, ingredients
+
 def parse_food_links(html):
     soup = BeautifulSoup(html, "html.parser")
     food_links = {}
@@ -52,12 +107,22 @@ def parse_food_links(html):
 def main():
     consumables_page = get(NECESSE_CONSUMABLES_PAGE)
     food_links = parse_food_links(consumables_page)
+    items = []
     for section, links in food_links.items():
-        print(f"\n{section} ({len(links)} items):")
         for link in links:
-            item = parse_page_name(link)
-            print(item)
+            name = parse_page_name(link).replace('_', ' ')
             html = get(link)
+            broker_value, result_count, ingredients = parse_food_page(html)
+            items.append(FoodItem(
+                name=name,
+                category=section,
+                broker_value=broker_value,
+                result_count=result_count,
+                ingredients=ingredients,
+            ))
+    with open("output/foods.json", "w", encoding="utf8") as f:
+        json.dump([asdict(item) for item in items], f, indent=2)
+    print(f"Wrote {len(items)} items to output/foods.json")
 
 if __name__ == "__main__":
     main()
