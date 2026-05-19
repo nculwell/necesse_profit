@@ -55,7 +55,9 @@ def main():
     for section, links in food_links.items():
         print(f"\n{section} ({len(links)} items):")
         for link in links:
-            print(" ", link)
+            item = parse_page_name(link)
+            print(item)
+            html = get(link)
 
 if __name__ == "__main__":
     main()
