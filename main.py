@@ -113,9 +113,34 @@ KNOWN_BROKER_VALUES = {
     "Any Common Fish": 12,  # all 7 common fish share this value
 }
 
-def analyze_profitability(items):
+def build_broker_lookup(items):
     broker = {item.name: item.broker_value for item in items if item.broker_value is not None}
     broker.update(KNOWN_BROKER_VALUES)
+    return broker
+
+def fetch_missing_ingredients(items, broker):
+    needed = {
+        ing["name"]
+        for item in items
+        for ing in item.ingredients
+        if ing["name"] not in broker
+    }
+    extra = {}
+    still_missing = []
+    for name in sorted(needed):
+        url = NECESSE_BASE_URL + "/" + name.replace(" ", "_")
+        try:
+            html = get(url)
+            bv, _, _ = parse_food_page(html)
+            if bv is not None:
+                extra[name] = bv
+            else:
+                still_missing.append(name)
+        except NotFoundError:
+            still_missing.append(name)
+    return extra, still_missing
+
+def analyze_profitability(items, broker):
 
     recipes = [item for item in items if item.ingredients]
 
@@ -196,7 +221,15 @@ def main():
         json.dump([asdict(item) for item in items], f, indent=2)
     print(f"Wrote {len(items)} items to output/foods.json")
 
-    report = analyze_profitability(items)
+    broker = build_broker_lookup(items)
+    extra, still_missing = fetch_missing_ingredients(items, broker)
+    broker.update(extra)
+    if extra:
+        print(f"Resolved {len(extra)} additional ingredient(s): {', '.join(sorted(extra))}")
+    if still_missing:
+        print(f"Could not resolve {len(still_missing)} ingredient(s): {', '.join(still_missing)}")
+
+    report = analyze_profitability(items, broker)
     with open("output/profitability.txt", "w", encoding="utf8") as f:
         f.write(report + "\n")
     print("Wrote output/profitability.txt")
