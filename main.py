@@ -31,12 +31,15 @@ def get(url):
             return f.read()
     except:
         pass # continue from here
-    print("Fetching URL:", url)
+    print("Fetching URL:", url, end='')
     response = requests.get(url)
     if response.status_code == 404:
+        print(" [NOT FOUND]")
         raise NotFoundError("Page not found: " + url)
     elif response.status_code != 200:
+        print(f" [ERROR {response.status_code}]")
         raise Exception(f"Unable to fetch page ({response.status_code}): {url}")
+    print(" [OK]")
     with open(path, "w", encoding="utf8") as f:
         f.write(response.text)
     return response.text
