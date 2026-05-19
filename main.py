@@ -104,6 +104,73 @@ def parse_food_links(html):
         food_links[section_id] = links
     return food_links
 
+KNOWN_BROKER_VALUES = {
+    "Any Common Fish": 12,  # all 7 common fish share this value
+}
+
+def analyze_profitability(items):
+    broker = {item.name: item.broker_value for item in items if item.broker_value is not None}
+    broker.update(KNOWN_BROKER_VALUES)
+
+    recipes = [item for item in items if item.ingredients]
+
+    out = []
+
+    def row(label, count, per_unit, total):
+        count_s  = str(count)  if count  is not None else "?"
+        per_s    = str(per_unit) if per_unit is not None else "?"
+        total_s  = str(total)  if total  is not None else "?"
+        return f"  {label:<26}  {count_s:>5}  {per_s:>9}  {total_s:>8}"
+
+    summary = []  # (name, category, cost, result_value, profit, pct) — None cost/profit if incomplete
+
+    for item in recipes:
+        out.append(f"\n{'─' * 60}")
+        out.append(f"{item.name}  [{item.category}]  →  broker value: {item.broker_value}")
+        out.append(row("Ingredient", "Count", "Broker/ea", "Total"))
+        out.append("  " + "─" * 56)
+
+        total_cost = 0
+        complete = True
+        for ing in item.ingredients:
+            name, count = ing["name"], ing["count"]
+            per_unit = broker.get(name)
+            if per_unit is None:
+                complete = False
+                total = None
+            else:
+                total = per_unit * count
+                total_cost += total
+            out.append(row(name, count, per_unit, total))
+
+        out.append("  " + "─" * 56)
+        if complete:
+            profit = item.broker_value - total_cost
+            pct = profit / total_cost * 100 if total_cost else float("inf")
+            out.append(row("Ingredients cost", "", "", total_cost))
+            out.append(row("Result value", "", "", item.broker_value))
+            out.append(row(f"Profit  ({pct:+.0f}%)", "", "", f"{profit:+d}"))
+            summary.append((item.name, item.category, total_cost, item.broker_value, profit, pct))
+        else:
+            out.append(row("Ingredients cost", "", "", "? (incomplete)"))
+            summary.append((item.name, item.category, None, item.broker_value, None, None))
+
+    out.append(f"\n{'═' * 60}")
+    out.append("SUMMARY  (sorted by profit margin, highest first)")
+    out.append(f"{'═' * 60}")
+    out.append(f"  {'Name':<26}  {'Category':<15}  {'Cost':>6}  {'Value':>6}  {'Profit':>7}  {'Margin':>7}")
+    out.append("  " + "─" * 74)
+
+    complete_rows = [(n, c, co, v, p, pct) for n, c, co, v, p, pct in summary if p is not None]
+    incomplete_rows = [(n, c, co, v, p, pct) for n, c, co, v, p, pct in summary if p is None]
+
+    for name, cat, cost, value, profit, pct in sorted(complete_rows, key=lambda r: r[5], reverse=True):
+        out.append(f"  {name:<26}  {cat:<15}  {cost:>6}  {value:>6}  {profit:>+7}  {pct:>+6.0f}%")
+    for name, cat, cost, value, profit, pct in incomplete_rows:
+        out.append(f"  {name:<26}  {cat:<15}  {'?':>6}  {value:>6}  {'?':>7}  {'?':>7}")
+
+    return "\n".join(out)
+
 def main():
     consumables_page = get(NECESSE_CONSUMABLES_PAGE)
     food_links = parse_food_links(consumables_page)
@@ -123,6 +190,11 @@ def main():
     with open("output/foods.json", "w", encoding="utf8") as f:
         json.dump([asdict(item) for item in items], f, indent=2)
     print(f"Wrote {len(items)} items to output/foods.json")
+
+    report = analyze_profitability(items)
+    with open("output/profitability.txt", "w", encoding="utf8") as f:
+        f.write(report + "\n")
+    print("Wrote output/profitability.txt")
 
 if __name__ == "__main__":
     main()
