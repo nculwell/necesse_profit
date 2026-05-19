@@ -199,10 +199,10 @@ def analyze_profitability(items, broker, generic_groups):
     out = []
 
     for generic_name, candidates in generic_groups.items():
-        out.append(f"{'─' * 40}")
+        out.append(f"{'-' * 40}")
         out.append(f"{generic_name}  (broker values, cheapest first)")
         out.append(f"  {'Item':<24}  {'Broker value':>12}")
-        out.append("  " + "─" * 38)
+        out.append("  " + "-" * 38)
         ranked = sorted([(n, broker[n]) for n in candidates if n in broker], key=lambda x: x[1])
         for n, v in ranked:
             out.append(f"  {n:<24}  {v:>12}")
@@ -214,13 +214,13 @@ def analyze_profitability(items, broker, generic_groups):
         total_s  = str(total)  if total  is not None else "?"
         return f"  {label:<26}  {count_s:>5}  {per_s:>9}  {total_s:>8}"
 
-    summary = []  # (name, category, cost, result_value, profit, pct) — None cost/profit if incomplete
+    summary = []  # (name, category, cost, result_value, profit, pct) -- None cost/profit if incomplete
 
     for item in recipes:
-        out.append(f"\n{'─' * 60}")
-        out.append(f"{item.name}  [{item.category}]  →  broker value: {item.broker_value}")
+        out.append(f"\n{'-' * 60}")
+        out.append(f"{item.name}  [{item.category}]  ->  broker value: {item.broker_value}")
         out.append(row("Ingredient", "Count", "Broker/ea", "Total"))
-        out.append("  " + "─" * 56)
+        out.append("  " + "-" * 56)
 
         total_cost = 0
         complete = True
@@ -235,7 +235,7 @@ def analyze_profitability(items, broker, generic_groups):
                 total_cost += total
             out.append(row(name, count, per_unit, total))
 
-        out.append("  " + "─" * 56)
+        out.append("  " + "-" * 56)
         if complete:
             profit = item.broker_value - total_cost
             pct = profit / total_cost * 100 if total_cost else float("inf")
@@ -247,11 +247,11 @@ def analyze_profitability(items, broker, generic_groups):
             out.append(row("Ingredients cost", "", "", "? (incomplete)"))
             summary.append((item.name, item.category, None, item.broker_value, None, None))
 
-    out.append(f"\n{'═' * 60}")
+    out.append(f"\n{'=' * 60}")
     out.append("SUMMARY  (sorted by profit margin, highest first)")
-    out.append(f"{'═' * 60}")
+    out.append(f"{'=' * 60}")
     out.append(f"  {'Name':<26}  {'Category':<15}  {'Cost':>6}  {'Value':>6}  {'Profit':>7}  {'Margin':>7}")
-    out.append("  " + "─" * 74)
+    out.append("  " + "-" * 74)
 
     complete_rows = [(n, c, co, v, p, pct) for n, c, co, v, p, pct in summary if p is not None]
     incomplete_rows = [(n, c, co, v, p, pct) for n, c, co, v, p, pct in summary if p is None]
