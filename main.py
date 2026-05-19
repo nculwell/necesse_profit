@@ -116,6 +116,23 @@ KNOWN_BROKER_VALUES = {
     "Any Common Fish": 12,  # all 7 common fish share this value
 }
 
+GENERIC_INGREDIENTS = {
+    "Any Fruit":    ["Apple", "Banana", "Blackberry", "Blueberry", "Coconut",
+                     "Lemon", "Raspberry", "Strawberry"],
+    "Any Raw Meat": ["Beef", "Duck Breast", "Frog Leg", "Rabbit Leg",
+                     "Raw Chicken Leg", "Raw Mutton", "Raw Pork", "Shark Meat"],
+}
+
+def resolve_ingredient(name, broker):
+    """Return (display_label, broker_value). For generics, picks cheapest candidate and formats
+    the label as e.g. 'Any Raw Meat (Raw Mutton)'."""
+    if name in GENERIC_INGREDIENTS:
+        candidates = [(n, broker[n]) for n in GENERIC_INGREDIENTS[name] if n in broker]
+        if candidates:
+            best_name, best_value = min(candidates, key=lambda x: x[1])
+            return f"{name} ({best_name})", best_value
+    return name, broker.get(name)
+
 def build_broker_lookup(items):
     broker = {item.name: item.broker_value for item in items if item.broker_value is not None}
     broker.update(KNOWN_BROKER_VALUES)
@@ -149,6 +166,16 @@ def analyze_profitability(items, broker):
 
     out = []
 
+    for generic_name, candidates in GENERIC_INGREDIENTS.items():
+        out.append(f"{'─' * 40}")
+        out.append(f"{generic_name}  (broker values, cheapest first)")
+        out.append(f"  {'Item':<24}  {'Broker value':>12}")
+        out.append("  " + "─" * 38)
+        ranked = sorted([(n, broker[n]) for n in candidates if n in broker], key=lambda x: x[1])
+        for n, v in ranked:
+            out.append(f"  {n:<24}  {v:>12}")
+        out.append("")
+
     def row(label, count, per_unit, total):
         count_s  = str(count)  if count  is not None else "?"
         per_s    = str(per_unit) if per_unit is not None else "?"
@@ -167,7 +194,7 @@ def analyze_profitability(items, broker):
         complete = True
         for ing in item.ingredients:
             name, count = ing["name"], ing["count"]
-            per_unit = broker.get(name)
+            name, per_unit = resolve_ingredient(name, broker)
             if per_unit is None:
                 complete = False
                 total = None
