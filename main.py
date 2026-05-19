@@ -192,8 +192,28 @@ def fetch_missing_ingredients(items, broker):
             still_missing.append(name)
     return extra, still_missing
 
+def expand_ingredients(ingredients, items_by_name):
+    """Recursively replace crafted ingredients with their base components."""
+    def expand_one(name, count):
+        item = items_by_name.get(name)
+        if item and item.ingredients:
+            result_count = item.result_count or 1
+            result = []
+            for ing in item.ingredients:
+                result.extend(expand_one(ing["name"], ing["count"] * count / result_count))
+            return result
+        return [(name, count)]
+
+    merged = {}
+    for ing in ingredients:
+        for base_name, base_count in expand_one(ing["name"], ing["count"]):
+            merged[base_name] = merged.get(base_name, 0) + base_count
+
+    return [{"name": n, "count": int(c) if c == int(c) else c} for n, c in merged.items()]
+
 def analyze_profitability(items, broker, generic_groups):
 
+    items_by_name = {item.name: item for item in items}
     recipes = [item for item in items if item.ingredients]
 
     out = []
@@ -224,7 +244,7 @@ def analyze_profitability(items, broker, generic_groups):
 
         total_cost = 0
         complete = True
-        for ing in item.ingredients:
+        for ing in expand_ingredients(item.ingredients, items_by_name):
             name, count = ing["name"], ing["count"]
             name, per_unit = resolve_ingredient(name, broker, generic_groups)
             if per_unit is None:
