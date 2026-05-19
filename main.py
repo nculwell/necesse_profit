@@ -26,7 +26,7 @@ def get(url):
         raise Exception(f"Unable to fetch page ({reponse.status_code}): {url}")
     with open(path, "w", encoding="utf8") as f:
         f.write(response.text)
-    return reponse.text
+    return response.text
 
 def main():
     consumables_page = get(NECESSE_CONSUMABLES_PAGE)
