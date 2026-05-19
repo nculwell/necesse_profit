@@ -129,6 +129,14 @@ def parse_group_members(html):
         if a
     ]
 
+# Corrections for known wiki errors, pending wiki fixes.
+GROUP_ADDITIONS = {
+    "Any Fruit": ["Strawberry"],
+}
+GROUP_REMOVALS = {
+    "Any Raw Meat": ["Milk"],
+}
+
 def build_generic_groups(missing_names):
     """For 'Any X' ingredients in missing_names, fetch their pages and parse members."""
     groups = {}
@@ -139,6 +147,8 @@ def build_generic_groups(missing_names):
         try:
             html = get(url)
             members = parse_group_members(html)
+            members = [m for m in members if m not in GROUP_REMOVALS.get(name, [])]
+            members += GROUP_ADDITIONS.get(name, [])
             if members:
                 groups[name] = members
         except NotFoundError:

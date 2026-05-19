@@ -1,11 +1,11 @@
-Things to verify in-game (wiki may be incorrect):
+Things to fix on the wiki (verified in-game):
 
-1. Strawberry not listed as a fruit on the Any Fruit wiki page.
-   Strawberry seems like it should be a valid "Any Fruit" ingredient, but it is
-   absent from the Fruits group page. Check whether the game accepts Strawberry
-   as a substitute in recipes that call for Any Fruit (e.g. Fruit Smoothie).
+1. Add Strawberry to the Any Fruit group page on the wiki.
+   Verified in-game: Strawberry is accepted as an "Any Fruit" ingredient.
+   Currently absent from the wiki's Fruits group page.
+   Workaround: hard-coded addition in GROUP_ADDITIONS in main.py.
 
-2. Milk listed as a raw meat on the Any Raw Meat wiki page.
-   Milk appears in the Raw Meat group, which causes Meatballs to show
-   "Any Raw Meat (Milk)" as the cheapest option. Almost certainly a wiki error.
-   Check which items the game actually accepts for Any Raw Meat recipes.
+2. Remove Milk from the Any Raw Meat group page on the wiki.
+   Verified in-game: Milk is not a valid "Any Raw Meat" ingredient.
+   Currently listed on the wiki's Raw Meat group page in error.
+   Workaround: hard-coded removal in GROUP_REMOVALS in main.py.
