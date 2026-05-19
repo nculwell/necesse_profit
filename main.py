@@ -14,6 +14,9 @@ NECESSE_CONSUMABLES_PAGE = NECESSE_BASE_URL + "/Consumables"
 
 FOOD_SECTIONS = ["Raw_Food", "Common_Fish", "Fine_Food", "Gourmet_Food"]
 
+class NotFoundError(Exception):
+    pass
+
 def parse_page_name(url):
     u = url.split('#')[0]
     u = url.split('?')[0]
@@ -30,7 +33,9 @@ def get(url):
         pass # continue from here
     print("Fetching URL:", url)
     response = requests.get(url)
-    if response.status_code != 200:
+    if response.status_code == 404:
+        raise NotFoundError("Page not found: " + url)
+    elif response.status_code != 200:
         raise Exception(f"Unable to fetch page ({response.status_code}): {url}")
     with open(path, "w", encoding="utf8") as f:
         f.write(response.text)
