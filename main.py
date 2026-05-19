@@ -242,7 +242,7 @@ def main():
             broker_value, result_count, ingredients = parse_food_page(html)
             items.append(FoodItem(
                 name=name,
-                category=section,
+                category=section.replace('_', ' '),
                 broker_value=broker_value,
                 result_count=result_count,
                 ingredients=ingredients,
