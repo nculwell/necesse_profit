@@ -268,10 +268,11 @@ def analyze_profitability(items, broker, generic_groups):
             out.append(row(f"Profit  ({pct:+.0f}%)", "", "", f"{profit:+d}"))
             summary.append((item.name, item.category, total_cost, item.broker_value, profit, pct))
             if profit > 0:
-                for ing_name, ing_count in resolved_ings:
-                    profit_per_unit = profit / ing_count
-                    if ing_name not in ing_best or profit_per_unit > ing_best[ing_name][2]:
-                        ing_best[ing_name] = (item.name, pct, profit_per_unit)
+                total_ing_units = sum(c for _, c in resolved_ings)
+                profit_per_ing_unit = profit / total_ing_units if total_ing_units else 0
+                for ing_name, _ in resolved_ings:
+                    if ing_name not in ing_best or profit_per_ing_unit > ing_best[ing_name][2]:
+                        ing_best[ing_name] = (item.name, pct, profit_per_ing_unit)
         else:
             out.append(row("Ingredients cost", "", "", "? (incomplete)"))
             summary.append((item.name, item.category, None, item.broker_value, None, None))
